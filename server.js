@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const fs = require('fs'); // Importar el módulo fs
+
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +15,12 @@ io.on('connection', (socket) => {
 
     socket.on('codeChange', (data) => {
         socket.broadcast.emit('codeChange', data);
+        // Escribir los cambios en un archivo
+            ('editorContent.txt', data, (err) => {
+            if (err) {
+                console.error('Error writing to file', err);
+            }
+        });
     });
 
     socket.on('disconnect', () => {
