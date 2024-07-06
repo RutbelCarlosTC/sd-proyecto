@@ -1,45 +1,47 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const fs = require('fs'); // Importar el módulo fs
-
+const os = require('os');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-app.use(express.static('public'));
+let currentEditorContent = ''; // Variable para almacenar el contenido actual del editor
+
+app.use(express.static(__dirname + '/public'));
 
 io.on('connection', (socket) => {
-    console.log('New client connected');
+    console.log('New user connected');
 
-    socket.on('codeChange', (data) => {
-        socket.broadcast.emit('codeChange', data);
-        // Escribir los cambios en un archivo
-            ('editorContent.txt', data, (err) => {
-            if (err) {
-                console.error('Error writing to file', err);
-            }
-        });
-    });
+    const serverIp = getServerIp();
+    console.log(`Ip de la sala: ${serverIp}`);
+
+    socket.emit('initialContent', currentEditorContent);
 
     socket.on('disconnect', () => {
-        console.log('Client disconnected');
+        console.log('User disconnected');
+    });
+
+    socket.on('codeChange', (data) => {
+        currentEditorContent = data; // Actualizar el contenido actual
+        socket.broadcast.emit('codeChange', data); // Broadcast code changes to all clients except sender
     });
 });
 
-const PORT = process.argv[2] || 3000;
-const HOST = '0.0.0.0';
-
-server.listen(PORT, HOST, () => {
-    console.log(`:)`);
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+    console.log(`http://localhost:${port}`);
 });
 
-server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${PORT} is already in use, please try another port.`);
-        process.exit(1);
-    } else {
-        throw error;
+function getServerIp() {
+    const interfaces = os.networkInterfaces();
+    for (let iface in interfaces) {
+        for (let alias of interfaces[iface]) {
+            if (alias.family === 'IPv4' && !alias.internal) {
+                return alias.address;
+            }
+        }
     }
-});
+    return '127.0.0.1'; // Valor predeterminado si no se puede encontrar una IP válida
+}
