@@ -11,6 +11,12 @@ let currentEditorContent = ''; // Variable para almacenar el contenido actual de
 
 app.use(express.static(__dirname + '/public'));
 
+// Ruta para mostrar el editor de texto en el servidor
+app.get('/editor', (req, res) => {
+    // Aquí podrías renderizar una página HTML que contenga el editor de texto
+    res.sendFile(__dirname + '/editor.html');
+});
+
 io.on('connection', (socket) => {
     console.log('New user connected');
 

@@ -55,42 +55,33 @@
 <body>
     <div class="container">
         <h1>Welcome to Collaborative Editor</h1>
-    
-        <div id="initialButtons">
-            <button onclick="startServer()">Crear una sala</button>
-            <button onclick="connectClient()">Unirme a una sala</button>
-        </div>
-
-        <div id="credenciales" style="display:none">
-            <input type="text" id="ip" placeholder="IP Servidor">
-            <button onclick="connectToServer()">Enter Editor</button>
+        <div id="textA">
+            <textarea id="editor"></textarea>
         </div>
     </div>
 
     <script>
-        let socket;
-        let isUpdating = false;
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
 
-        function startServer() {
-            window.location.href = `http://localhost:3000/editor`;
-        }
+            let isUpdating = false;
+            const editor = document.getElementById('editor');
 
-        function connectClient() {
-            const initialButtons = document.getElementById('initialButtons');
-            initialButtons.style.display = 'none';
+            editor.addEventListener('input', () => {
+                if (!isUpdating) {
+                    socket.emit('codeChange', editor.value);
+                }
+            });
 
-            const credenciales = document.getElementById('credenciales');
-            credenciales.style.display = "block";
-        }
-
-        function connectToServer() {
-            const ip = document.getElementById('ip').value.trim(); // Obtener IP ingresado
-            if (!ip) {
-                alert('Por favor ingrese la dirección IP del servidor.');
-                return;
-            }
-            window.location.href = `http://${ip}:3000/editor`;
-        }
+            socket.on('codeChange', (data) => {
+                isUpdating = true;
+                editor.value = data;
+                isUpdating = false;
+            });
+            socket.on('initialContent', (data) => {
+                editor.value = data; // Set initial content
+            });
+        });
     </script>
 </body>
 </html>
