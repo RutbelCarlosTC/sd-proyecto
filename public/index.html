@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>Collaborative Editor</title>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
-        #editor {
-            width: 130vh;
+        /* Estilos previos */
+        #editor-container {
             height: 90vh;
-            font-size: 25px;
+            width: 130vh;
         }
         body {
             font-family: Arial, sans-serif;
@@ -42,7 +44,7 @@
         .input-container.show {
             display: block;
         }
-        input[type="text"] {
+        input[type="text"], input[type="password"] {
             padding: 10px;
             font-size: 16px;
             border: 1px solid #ccc;
@@ -50,46 +52,79 @@
             width: 200px;
             margin-right: 10px;
         }
+        #serverIp {
+            margin-top: 20px;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Welcome to Collaborative Editor</h1>
-    
+
         <div id="initialButtons">
-            <button onclick="startServer()">Crear una sala</button>
-            <button onclick="connectClient()">Unirme a una sala</button>
+            <button onclick="showCreateRoom()">Crear una sala</button>
+            <button onclick="showJoinRoom()">Unirme a una sala</button>
         </div>
 
-        <div id="credenciales" style="display:none">
+        <div id="createRoom" class="input-container">
+            <input type="text" id="createName" placeholder="Nombre">
+            <input type="password" id="createPassword" placeholder="Contraseña">
+            <button onclick="startServer()">Crear Sala</button>
+        </div>
+
+        <div id="joinRoom" class="input-container">
+            <input type="text" id="joinName" placeholder="Nombre">
             <input type="text" id="ip" placeholder="IP Servidor">
-            <button onclick="connectToServer()">Enter Editor</button>
+            <input type="password" id="joinPassword" placeholder="Contraseña">
+            <button onclick="connectToServer()">Unirme</button>
+        </div>
+
+        <div id="serverIp" style="display:none">
+            <p>IP del servidor: <span id="ipAddress"></span></p>
         </div>
     </div>
 
     <script>
         let socket;
-        let isUpdating = false;
+        let roomPassword;
 
-        function startServer() {
-            window.location.href = `http://localhost:3000/editor`;
+        function showCreateRoom() {
+            document.getElementById('initialButtons').style.display = 'none';
+            document.getElementById('createRoom').classList.add('show');
         }
 
-        function connectClient() {
-            const initialButtons = document.getElementById('initialButtons');
-            initialButtons.style.display = 'none';
+        function showJoinRoom() {
+            document.getElementById('initialButtons').style.display = 'none';
+            document.getElementById('joinRoom').classList.add('show');
+        }
 
-            const credenciales = document.getElementById('credenciales');
-            credenciales.style.display = "block";
+        function startServer() {
+            const name = document.getElementById('createName').value.trim();
+            roomPassword = document.getElementById('createPassword').value.trim();
+            if (!name || !roomPassword) {
+                alert('Por favor ingrese su nombre y una contraseña.');
+                return;
+            }
+            fetch('/getServerIp')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('serverIp').style.display = 'block';
+                    document.getElementById('ipAddress').textContent = data.ip;
+                    window.location.href = `http://${data.ip}:3000/editor?name=${name}&password=${roomPassword}`;
+                })
+                .catch(error => console.error('Error:', error));
         }
 
         function connectToServer() {
-            const ip = document.getElementById('ip').value.trim(); // Obtener IP ingresado
-            if (!ip) {
-                alert('Por favor ingrese la dirección IP del servidor.');
+            const name = document.getElementById('joinName').value.trim();
+            const ip = document.getElementById('ip').value.trim();
+            const joinPassword = document.getElementById('joinPassword').value.trim();
+            if (!name || !ip || !joinPassword) {
+                alert('Por favor ingrese su nombre, la dirección IP del servidor y la contraseña.');
                 return;
             }
-            window.location.href = `http://${ip}:3000/editor`;
+            window.location.href = `http://${ip}:3000/editor?name=${name}&password=${joinPassword}`;
         }
     </script>
 </body>

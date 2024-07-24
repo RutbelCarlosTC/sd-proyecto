@@ -1,37 +1,68 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const os = require('os');
+const ShareDB = require('sharedb');
+const richText = require('rich-text');
+
+ShareDB.types.register(richText.type);
+
+const backend = new ShareDB();
+const connection = backend.connect();
+const doc = connection.get('examples', 'richtext');
+doc.create({ ops: [] }, 'rich-text');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-let currentEditorContent = ''; // Variable para almacenar el contenido actual del editor
+let roomPassword;
 
 app.use(express.static(__dirname + '/public'));
 
-// Ruta para mostrar el editor de texto en el servidor
 app.get('/editor', (req, res) => {
-    // Aquí podrías renderizar una página HTML que contenga el editor de texto
     res.sendFile(__dirname + '/editor.html');
+});
+
+app.get('/getServerIp', (req, res) => {
+    res.json({ ip: getServerIp() });
 });
 
 io.on('connection', (socket) => {
     console.log('New user connected');
 
-    const serverIp = getServerIp();
-    console.log(`Ip de la sala: ${serverIp}`);
+    socket.on('join', (data) => {
+        const { name, password } = data;
+        if (!roomPassword) {
+            roomPassword = password;
+            socket.emit('initialContent', doc.data);
+            socket.join('editorRoom');
+        } else if (password === roomPassword) {
+            doc.fetch((err) => {
+                if (err) throw err;
+                socket.emit('initialContent', doc.data);
+                socket.join('editorRoom');
 
-    socket.emit('initialContent', currentEditorContent);
+                socket.on('text-change', (delta) => {
+                    doc.submitOp(delta, { source: socket });
+                });
+
+                doc.on('op', (op, source) => {
+                    if (source !== socket) {
+                        socket.emit('text-change', op);
+                    }
+                });
+
+                socket.on('chatMessage', (messageData) => {
+                    io.to('editorRoom').emit('chatMessage', messageData);
+                });
+            });
+        } else {
+            socket.emit('invalidPassword');
+        }
+    });
 
     socket.on('disconnect', () => {
         console.log('User disconnected');
-    });
-
-    socket.on('codeChange', (data) => {
-        currentEditorContent = data; // Actualizar el contenido actual
-        socket.broadcast.emit('codeChange', data); // Broadcast code changes to all clients except sender
     });
 });
 
@@ -41,7 +72,7 @@ server.listen(port, () => {
 });
 
 function getServerIp() {
-    const interfaces = os.networkInterfaces();
+    const interfaces = require('os').networkInterfaces();
     for (let iface in interfaces) {
         for (let alias of interfaces[iface]) {
             if (alias.family === 'IPv4' && !alias.internal) {
@@ -49,5 +80,5 @@ function getServerIp() {
             }
         }
     }
-    return '127.0.0.1'; // Valor predeterminado si no se puede encontrar una IP válida
+    return '127.0.0.1';
 }

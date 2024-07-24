@@ -3,84 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <title>Collaborative Editor</title>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
-        #editor {
-            width: 130vh;
+        #editor-container {
             height: 90vh;
-            font-size: 25px;
+            width: 80vw;
         }
-        body {
-            font-family: Arial, sans-serif;
+        #chat-container {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20vw;
+            height: 30vh;
+            background-color: white;
+            border: 1px solid #ccc;
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
+            flex-direction: column;
         }
-        .container {
-            text-align: center;
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
         }
-        .container button {
-            padding: 15px 30px;
-            font-size: 18px;
-            margin: 10px;
-            cursor: pointer;
+        .message {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 5px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        #message-form {
+            display: flex;
+        }
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #send-button {
+            padding: 10px;
             border: none;
             background-color: #007bff;
             color: white;
+            cursor: pointer;
             border-radius: 5px;
         }
-        .container button:hover {
+        #send-button:hover {
             background-color: #0056b3;
-        }
-        .input-container {
-            display: none;
-            margin-top: 20px;
-        }
-        .input-container.show {
-            display: block;
-        }
-        input[type="text"] {
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 200px;
-            margin-right: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to Collaborative Editor</h1>
-        <div id="textA">
-            <textarea id="editor"></textarea>
-        </div>
+    <div id="editor-container"></div>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <form id="message-form">
+            <input type="text" id="message-input" placeholder="Escribe un mensaje...">
+            <button type="submit" id="send-button">Enviar</button>
+        </form>
     </div>
-
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const socket = io();
+        const urlParams = new URLSearchParams(window.location.search);
+        const userName = urlParams.get('name');
+        const roomPassword = urlParams.get('password');
 
-            let isUpdating = false;
-            const editor = document.getElementById('editor');
+        const socket = io();
 
-            editor.addEventListener('input', () => {
-                if (!isUpdating) {
-                    socket.emit('codeChange', editor.value);
-                }
-            });
+        socket.emit('join', { name: userName, password: roomPassword });
 
-            socket.on('codeChange', (data) => {
-                isUpdating = true;
-                editor.value = data;
-                isUpdating = false;
-            });
-            socket.on('initialContent', (data) => {
-                editor.value = data; // Set initial content
-            });
+        const quill = new Quill('#editor-container', {
+            theme: 'snow'
+        });
+
+        quill.on('text-change', (delta, oldDelta, source) => {
+            if (source === 'user') {
+                socket.emit('text-change', delta);
+            }
+        });
+
+        socket.on('text-change', (delta) => {
+            quill.updateContents(delta);
+        });
+
+        socket.on('initialContent', (content) => {
+            quill.setContents(content);
+        });
+
+        socket.on('invalidPassword', () => {
+            alert('Contraseña incorrecta. No se puede unir a la sala.');
+            window.location.href = '/';
+        });
+
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        const messages = document.getElementById('messages');
+
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value;
+            if (message) {
+                socket.emit('chatMessage', { name: userName, message: message });
+                messageInput.value = '';
+            }
+        });
+
+        socket.on('chatMessage', (data) => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.textContent = `${data.name}: ${data.message}`;
+            messages.appendChild(messageElement);
+            messages.scrollTop = messages.scrollHeight;
         });
     </script>
 </body>
